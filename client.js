@@ -227,6 +227,9 @@ window.__ModuleLoader__.load({
       '.bsw-set-btn:hover{border-color:var(--bsw-blue-2,#38BDF8)}',
       '.bsw-set-btn-on{border-color:var(--bsw-blue-2,#38BDF8);background:rgba(56,189,248,.16);color:var(--bsw-blue-2,#38BDF8);font-weight:640}',
       '.bsw-sw-preview{width:22px;height:22px;border-radius:7px;display:inline-block;border:1px solid rgba(255,255,255,.25)}',
+      '.bsw-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}',
+      '.bsw-pop:focus{outline:none}',
+      '.bsw-pill:focus-visible,.bsw-pop-close:focus-visible,.bsw-set-btn:focus-visible{outline:2px solid var(--bsw-blue,#4DA3FF);outline-offset:2px}',
       '.bsw-notice{padding:9px 16px;font-size:calc(16px * var(--bsw-fs,1));color:var(--dsw-alias-state-warn-primary,#F59E0B);background:rgba(245,158,11,.12);border-bottom:1px solid rgba(245,158,11,.3)}',
       '.bsw-card[data-wait="1"]{border-left-color:var(--dsw-alias-state-warn-primary,#F59E0B)}',
       '.bsw-action-name-wait{background:rgba(245,158,11,.16);color:var(--dsw-alias-state-warn-primary,#F59E0B)!important}',
@@ -631,32 +634,42 @@ window.__ModuleLoader__.load({
       const maxTokens = rows.reduce(function (max, row) { return Math.max(max, row.tokens) }, 0)
       React.useEffect(function () {
         if (!open || typeof document === 'undefined') return function () {}
+        const focusTimer = window.setTimeout(function () {
+          const pop = popRef.current
+          if (pop && typeof pop.focus === 'function') pop.focus()
+        }, 0)
         function onKey(event) {
-          if (event.key === 'Escape') {
-            setOpen(false)
-            if (pillRef.current && typeof pillRef.current.focus === 'function') pillRef.current.focus()
-          }
+          if (event.key === 'Escape') closePop()
         }
         function onPointer(event) {
           const target = event.target
           if (popRef.current && popRef.current.contains(target)) return
           if (pillRef.current && pillRef.current.contains(target)) return
-          setOpen(false)
+          closePop()
         }
         document.addEventListener('keydown', onKey, true)
         document.addEventListener('pointerdown', onPointer, true)
         return function () {
+          window.clearTimeout(focusTimer)
           document.removeEventListener('keydown', onKey, true)
           document.removeEventListener('pointerdown', onPointer, true)
         }
       }, [open])
+
+      function closePop() {
+        setOpen(false)
+        const pill = pillRef.current
+        if (pill && typeof pill.focus === 'function') {
+          window.setTimeout(function () { pill.focus() }, 0)
+        }
+      }
 
       const palettes = Object.keys(PALETTES)
       const fonts = Object.keys(FONT_STEPS)
       // 点卡片：跳到那个子代理的会话；跳成功就收起弹层，让位给对话
       function openRow(row) {
         const result = openAgentSession(row.id)
-        if (result === true) { setNotice(''); setOpen(false); return }
+        if (result === true) { setNotice(''); closePop(); return }
         setNotice(result === 'no-service' ? '跳转失败：拿不到会话导航服务（uiWorkspace）' : '这个会话打不开，可能已结束')
         if (typeof window !== 'undefined') window.setTimeout(function () { setNotice('') }, 4000)
       }
@@ -664,7 +677,7 @@ window.__ModuleLoader__.load({
         className: 'bsw-dock' + (!prefs.animate || degraded ? ' bsw-static' : (light ? ' bsw-light' : '')),
         style: prefsStyle(prefs),
       },
-        open && h('div', { className: 'bsw-pop', id: 'bsw-pop', role: 'dialog', 'aria-modal': 'false', 'aria-label': '鱼群雷达', ref: popRef },
+        open && h('div', { className: 'bsw-pop', id: 'bsw-pop', role: 'dialog', 'aria-modal': 'false', 'aria-label': '鱼群雷达', tabIndex: -1, ref: popRef },
           h('div', { className: 'bsw-pop-head' },
             h('div', { className: 'bsw-pop-title' },
               prefs.style === 'cute'
@@ -682,7 +695,7 @@ window.__ModuleLoader__.load({
             h('button', {
               type: 'button', className: 'bsw-pop-close',
               title: '收起', 'aria-label': '收起',
-              onClick: function () { setOpen(false) },
+              onClick: closePop,
             }, '收起')
           ),
           showSettings && h('div', { className: 'bsw-settings' },
@@ -691,6 +704,8 @@ window.__ModuleLoader__.load({
                 return h('button', {
                   key: key, type: 'button',
                   className: 'bsw-set-btn' + (prefs.style === key ? ' bsw-set-btn-on' : ''),
+                  'aria-pressed': prefs.style === key,
+                  'aria-label': '主题：' + STYLE_OPTIONS[key],
                   onClick: function () { updatePrefs({ style: key }) },
                 }, STYLE_OPTIONS[key])
               })
@@ -700,6 +715,8 @@ window.__ModuleLoader__.load({
                 return h('button', {
                   key: key, type: 'button',
                   className: 'bsw-set-btn' + (prefs.font === key ? ' bsw-set-btn-on' : ''),
+                  'aria-pressed': prefs.font === key,
+                  'aria-label': '字号：' + FONT_STEPS[key].name,
                   onClick: function () { updatePrefs({ font: key }) },
                 }, FONT_STEPS[key].name)
               })
@@ -710,6 +727,8 @@ window.__ModuleLoader__.load({
                   key: key, type: 'button',
                   className: 'bsw-set-btn' + (prefs.palette === key ? ' bsw-set-btn-on' : ''),
                   title: PALETTES[key].name,
+                  'aria-pressed': prefs.palette === key,
+                  'aria-label': '色系：' + PALETTES[key].name,
                   onClick: function () { updatePrefs({ palette: key }) },
                 }, h('span', {
                   className: 'bsw-sw-preview',
@@ -720,24 +739,29 @@ window.__ModuleLoader__.load({
             h('span', { className: 'bsw-set-group' }, '动画',
               h('button', {
                 type: 'button', className: 'bsw-set-btn' + (prefs.animate ? ' bsw-set-btn-on' : ''),
+                'aria-pressed': prefs.animate, 'aria-label': '动画：开',
                 onClick: function () { updatePrefs({ animate: true }) },
               }, '开'),
               h('button', {
                 type: 'button', className: 'bsw-set-btn' + (!prefs.animate ? ' bsw-set-btn-on' : ''),
+                'aria-pressed': !prefs.animate, 'aria-label': '动画：关',
                 onClick: function () { updatePrefs({ animate: false }) },
               }, '关')
             ),
             h('span', { className: 'bsw-set-group' }, '完成',
               h('button', {
                 type: 'button', className: 'bsw-set-btn' + (prefs.showDone ? ' bsw-set-btn-on' : ''),
+                'aria-pressed': prefs.showDone, 'aria-label': '完成卡：显示',
                 onClick: function () { updatePrefs({ showDone: true }) },
               }, '显示'),
               h('button', {
                 type: 'button', className: 'bsw-set-btn' + (!prefs.showDone ? ' bsw-set-btn-on' : ''),
+                'aria-pressed': !prefs.showDone, 'aria-label': '完成卡：隐藏',
                 onClick: function () { updatePrefs({ showDone: false }) },
               }, '隐藏')
             )
           ),
+          h('span', { className: 'bsw-sr', 'aria-live': 'polite' }, active + ' 个活跃'),
           notice && h('div', { className: 'bsw-notice', role: 'status' }, notice),
           h('div', { className: 'bsw-pop-body' },
             rows.length === 0
