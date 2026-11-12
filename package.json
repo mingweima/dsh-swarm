@@ -1,8 +1,32 @@
 {
   "name": "@local/bigfish-swarm",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
-  "description": "鱼群雷达：实时显示正在工作或刚完成的子智能体，带任务、耗时与 token 进度条。",
+  "description": "鱼群雷达：在 DSH 右下角实时显示正在工作或刚完成的子智能体，带任务、耗时与 token 进度条，肥鱼/极简双主题。",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "plugin",
+    "bundle",
+    "subagent",
+    "agents",
+    "radar",
+    "progress"
+  ],
+  "license": "MIT",
+  "author": "Mingwei Ma",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mingweima/dsh-swarm.git"
+  },
+  "homepage": "https://github.com/mingweima/dsh-swarm#readme",
+  "bugs": {
+    "url": "https://github.com/mingweima/dsh-swarm/issues"
+  },
+  "engines": {
+    "dsh": ">=0.2.2-rc.2 <0.3.0"
+  },
   "type": "module",
   "exports": {
     ".": "./index.js",
@@ -13,7 +37,10 @@
     "index.js",
     "client.js",
     "cordis.patch.yml",
-    "icon.svg"
+    "icon.svg",
+    "assets/pet-runner.png",
+    "README.md",
+    "LICENSE"
   ],
   "dsh": {
     "bundle": {

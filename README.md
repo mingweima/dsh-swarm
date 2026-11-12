@@ -17,16 +17,28 @@ DeepSeek Harness（DSH）桌面版的子智能体实时监控面板。
 
 ## 安装
 
-在 DSH profile 目录（如 `~/.dsh/profiles/desktop`）里用 pnpm 链接本目录，或在「设置 → 插件 → 添加本地插件」选择本目录：
+要求 DSH `>=0.2.2-rc.2 <0.3.0`（见 `package.json` 的 `engines.dsh`）。
+
+### 方式一：直接从 GitHub 安装（推荐）
+
+DSH 的安装框与命令行都接受 Git 规格，仓库根就是包根，clone 下来即用，无需构建：
+
+- **图形界面**：Plugins → Add plugin → 填 `github:mingweima/dsh-swarm`
+- **命令行**（Desktop 需先在应用菜单里装好 `dsh` 命令）：
 
 ```bash
-cd ~/.dsh/profiles/desktop
-pnpm add link:/path/to/dsh-swarm
+dsh plugin --profile desktop add github:mingweima/dsh-swarm   # dsh web 用户把 desktop 换成 web
 ```
 
-然后把 `@local/bigfish-swarm` 加进 `package.json` 的 `dsh.profile.bundles`。
+装完即可用：依赖、`dsh.profile.bundles` 由 CLI 自动写入，`cordis.patch.yml` 由包内自带，无需手改；包名是 `@local/bigfish-swarm`。要锁定某个提交，在规格末尾加 `#<40 位 commit sha>`。
 
-也可以在任意插件目录复制本仓库文件后，用 DSH 的 `plugin_manager` 以本地目录方式安装。
+### 方式二：本地目录（开发自用，改文件即生效）
+
+```bash
+dsh plugin --profile desktop add link:/path/to/dsh-swarm
+```
+
+或在「设置 → 插件 → 添加本地插件」选择本目录。
 
 ## 使用
 
