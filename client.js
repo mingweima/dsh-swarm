@@ -19,6 +19,30 @@ window.__ModuleLoader__.load({
 
     let serviceCtx = null
 
+    // 点击卡片 → 打开对应子代理会话；用官方导航入口 uiWorkspace.openSession(SessionId)
+    function openAgentSession(sessionId) {
+      if (!sessionId) return false
+      const ctx = serviceCtx
+      if (!ctx) return false
+      let face = null
+      try {
+        face = (ctx.uiWorkspace) || (typeof ctx.get === 'function' ? ctx.get('uiWorkspace') : null)
+      } catch (error) { face = null }
+      if (!face || typeof face.openSession !== 'function') return false
+      try {
+        const pending = face.openSession(String(sessionId))
+        if (pending && typeof pending.catch === 'function') {
+          pending.catch(function (error) {
+            if (typeof console !== 'undefined') console.warn('[bigfish-swarm] openSession rejected', error)
+          })
+        }
+        return true
+      } catch (error) {
+        if (typeof console !== 'undefined') console.warn('[bigfish-swarm] openSession failed', error)
+        return false
+      }
+    }
+
     // ================= 工具 =================
     function tokenTotal(usage) {
       if (!usage || typeof usage !== 'object') return 0
@@ -43,6 +67,23 @@ window.__ModuleLoader__.load({
       const two = function (v) { return (v < 10 ? '0' : '') + v }
       if (hours > 0) return hours + ':' + two(minutes) + ':' + two(seconds)
       return minutes + ':' + two(seconds)
+    }
+
+    // 兼容 Map / 普通对象两种形态（DSH 版本演进时不会静默挂掉）
+    function asRecord(value) {
+      if (!value) return {}
+      if (typeof Map !== 'undefined' && value instanceof Map) {
+        const out = {}
+        value.forEach(function (v, k) { out[k] = v })
+        return out
+      }
+      return typeof value === 'object' ? value : {}
+    }
+
+    function statusOf(statuses, id) {
+      if (!statuses) return undefined
+      if (typeof statuses.get === 'function') return statuses.get(id)
+      return statuses[id]
     }
 
     function tailText(text, limit) {
@@ -72,47 +113,54 @@ window.__ModuleLoader__.load({
       '.bsw-pill-count{font-variant-numeric:tabular-nums;color:var(--bsw-blue-2,#38BDF8)}',
       '.bsw-pill-count-idle{color:var(--dsw-alias-label-secondary,#9AA3B6)}',
       '.bsw-pill-caret{font-size:calc(20px * var(--bsw-fs,1));color:var(--dsw-alias-label-secondary,#9AA3B6);margin-left:2px}',
-      '.bsw-pop{width:620px;max-width:calc(100vw - 48px);max-height:min(560px,calc(100dvh - 428px));display:flex;flex-direction:column;border-radius:16px;border:1px solid var(--dsw-alias-border-l1,#242833);background:var(--dsw-alias-bg-layer-1,#12151C);box-shadow:0 18px 48px rgba(0,0,0,.4);overflow:hidden;animation:bsw-pop-in .16s ease-out}',
+      '.bsw-pop{width:620px;max-width:calc(100vw - 48px);max-height:min(560px,calc(100vh - 220px));max-height:min(560px,calc(100dvh - 220px));display:flex;flex-direction:column;border-radius:16px;border:1px solid var(--dsw-alias-border-l1,#242833);background:var(--dsw-alias-bg-layer-1,#12151C);box-shadow:0 18px 48px rgba(0,0,0,.4);overflow:hidden;animation:bsw-pop-in .16s ease-out}',
       '@keyframes bsw-pop-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}',
       '.bsw-pop-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px 12px;border-bottom:1px solid var(--dsw-alias-border-l1,#242833);background:var(--dsw-alias-bg-layer-2,#191D26)}',
-      '.bsw-pop-title{display:flex;align-items:center;gap:12px;font-size:calc(26px * var(--bsw-fs,1));font-weight:680;flex-shrink:0;white-space:nowrap}',
-      '.bsw-pop-scan{position:relative;flex:1 1 40px;min-width:30px;height:2px;margin:0 14px;overflow:hidden;border-radius:999px;background:linear-gradient(90deg,transparent,var(--dsw-alias-border-l1,#242833),transparent)}',
+      '.bsw-pop-title{display:flex;align-items:center;gap:10px;font-size:calc(24px * var(--bsw-fs,1));font-weight:680;flex-shrink:0;white-space:nowrap}',
+      '.bsw-pop-scan{position:relative;flex:1 1 24px;min-width:16px;height:2px;margin:0 10px;overflow:hidden;border-radius:999px;background:linear-gradient(90deg,transparent,var(--dsw-alias-border-l1,#242833),transparent)}',
       '.bsw-pop-scan i{position:absolute;top:0;left:0;width:34%;height:100%;border-radius:999px;background:linear-gradient(90deg,transparent,var(--bsw-blue-2,#38BDF8),transparent);animation:bsw-sweep 3.2s cubic-bezier(.4,0,.2,1) infinite}',
       '@keyframes bsw-sweep{0%{transform:translateX(-120%)}55%{transform:translateX(260%)}100%{transform:translateX(430%)}}',
       '.bsw-pop-stat{font-size:calc(22px * var(--bsw-fs,1));color:var(--dsw-alias-label-secondary,#9AA3B6);font-variant-numeric:tabular-nums;white-space:nowrap;flex-shrink:0}',
-      '.bsw-pop-close{appearance:none;border:1px solid var(--dsw-alias-border-l1,#242833);background:transparent;color:var(--dsw-alias-label-secondary,#9AA3B6);border-radius:10px;padding:4px 14px;font-size:calc(22px * var(--bsw-fs,1));font-family:inherit;cursor:pointer;flex-shrink:0;white-space:nowrap}',
+      '.bsw-pop-close{appearance:none;border:1px solid var(--dsw-alias-border-l1,#242833);background:transparent;color:var(--dsw-alias-label-secondary,#9AA3B6);border-radius:10px;padding:3px 11px;font-size:calc(20px * var(--bsw-fs,1));font-family:inherit;cursor:pointer;flex-shrink:0;white-space:nowrap}',
       '.bsw-pop-close:hover{color:var(--dsw-alias-label-primary,#E9ECF3);border-color:var(--dsw-alias-border-l2,#2F3441)}',
-      '.bsw-pop-body{padding:14px 16px 16px;overflow:auto;display:flex;flex-direction:column;gap:12px}',
-      '.bsw-card{position:relative;display:flex;flex-direction:column;justify-content:center;padding:16px 18px 16px 20px;background:var(--dsw-alias-bg-layer-1,#12151C);border:1px solid var(--dsw-alias-border-l1,#242833);border-left:6px solid var(--bsw-blue,#4DA3FF);border-radius:12px;transition:opacity 1.2s cubic-bezier(.4,0,1,1),transform 1.2s cubic-bezier(.4,0,1,1),border-color .2s ease,background .2s ease;animation:bsw-enter .22s ease-out}',
-      '.bsw-card-done{border-left-color:var(--dsw-alias-state-idle-primary,#6B7280);opacity:.7;background:var(--dsw-alias-bg-layer-2,#191D26)}',
+      '.bsw-pop-body{padding:12px 14px 14px;overflow:auto;display:flex;flex-direction:column;gap:10px}',
+      '.bsw-card{position:relative;display:flex;flex-direction:column;justify-content:center;padding:13px 16px 13px 18px;background:var(--dsw-alias-bg-layer-1,#12151C);border:1px solid var(--dsw-alias-border-l1,#242833);border-left:6px solid var(--bsw-blue,#4DA3FF);border-radius:12px;transition:opacity 1.2s cubic-bezier(.4,0,1,1),transform 1.2s cubic-bezier(.4,0,1,1),border-color .2s ease,background .2s ease;animation:bsw-enter .22s ease-out}',
+      '.bsw-card-done{border-left-color:#3A4459;background:var(--dsw-alias-bg-layer-2,#191D26)}',
+      '.bsw-card-done .bsw-name{color:var(--dsw-alias-label-secondary,#AEB6C6)}',
       '.bsw-card-retire{opacity:0;transform:translateY(10px)}',
+      '.bsw-card-open{cursor:pointer}',
+      '.bsw-card-open:hover{border-color:color-mix(in srgb,var(--bsw-blue,#4DA3FF) 60%,#2A3040);background:color-mix(in srgb,var(--bsw-blue,#4DA3FF) 9%,var(--dsw-alias-bg-layer-1,#12151C));transform:translateY(-1px);box-shadow:0 8px 24px rgba(0,0,0,.35)}',
+      '.bsw-card-open:active{transform:translateY(0)}',
+      '.bsw-card-open:focus-visible{outline:2px solid var(--bsw-blue,#4DA3FF);outline-offset:2px}',
+      '.bsw-open-hint{margin-left:auto;font-size:calc(15px * var(--bsw-fs,1));line-height:1;color:var(--bsw-blue-2,#38BDF8);opacity:.55;transition:opacity .16s ease;white-space:nowrap;flex-shrink:0}',
+      '.bsw-card-open:hover .bsw-open-hint,.bsw-card-open:focus-visible .bsw-open-hint{opacity:1}','.bsw-card-done .bsw-open-hint{color:var(--dsw-alias-label-secondary,#9AA3B6)}',
       '@keyframes bsw-enter{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}',
       '.bsw-row1{display:flex;align-items:center;justify-content:space-between;gap:12px}',
       '.bsw-name-wrap{display:flex;align-items:center;gap:12px;min-width:0}',
       '.bsw-dotwrap{position:relative;width:14px;height:14px;flex-shrink:0}',
-      '.bsw-dot{position:relative;z-index:1;width:14px;height:14px;border-radius:50%;background:var(--bsw-blue,#4DA3FF);animation:bsw-pulse 1.6s ease-in-out infinite}',
+      '.bsw-dot{position:relative;z-index:1;width:9px;height:9px;border-radius:50%;background:var(--bsw-blue,#4DA3FF);animation:bsw-pulse 1.6s ease-in-out infinite}',
       '.bsw-dot-done{background:var(--dsw-alias-state-idle-primary,#6B7280);animation:none}',
       '@keyframes bsw-pulse{0%,100%{opacity:.45}50%{opacity:1}}',
       '.bsw-ring{position:absolute;inset:0;border-radius:50%;border:2px solid var(--bsw-blue,#4DA3FF);animation:bsw-ring 1.8s cubic-bezier(.2,.6,.3,1) infinite}',
       '@keyframes bsw-ring{0%{transform:scale(1);opacity:.5}100%{transform:scale(2.4);opacity:0}}',
       '.bsw-name{font-size:calc(26px * var(--bsw-fs,1));font-weight:640;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-      '.bsw-duration{font-size:calc(24px * var(--bsw-fs,1));font-weight:640;font-variant-numeric:tabular-nums;color:var(--dsw-alias-label-primary,#E9ECF3);white-space:nowrap}',
+      '.bsw-duration{font-size:calc(20px * var(--bsw-fs,1));font-weight:560;font-variant-numeric:tabular-nums;color:var(--dsw-alias-label-secondary,#AEB6C6);white-space:nowrap;letter-spacing:.02em}',
       '.bsw-duration-done{color:var(--dsw-alias-label-secondary,#9AA3B6);font-weight:500}',
-      '.bsw-row2{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px;min-width:0}',
-      '.bsw-id{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:calc(22px * var(--bsw-fs,1));padding:1px 10px;border:1px solid var(--dsw-alias-border-l1,#242833);border-radius:999px;color:var(--dsw-alias-label-secondary,#9AA3B6);flex-shrink:0}',
-      '.bsw-action{display:flex;align-items:center;gap:8px;min-width:0;font-size:calc(22px * var(--bsw-fs,1));color:var(--dsw-alias-label-secondary,#9AA3B6)}',
-      '.bsw-action-name{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:calc(22px * var(--bsw-fs,1));padding:1px 10px;background:var(--dsw-alias-bg-layer-2,#191D26);border-radius:8px;color:var(--dsw-alias-label-primary,#E9ECF3);flex-shrink:0}',
+      '.bsw-row2{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:7px;min-width:0;padding-left:24px}',
+      '.bsw-id{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:calc(16px * var(--bsw-fs,1));padding:0 8px;border:1px solid var(--dsw-alias-border-l1,#242833);border-radius:6px;color:var(--dsw-alias-label-secondary,#9AA3B6);flex-shrink:0}',
+      '.bsw-action{display:flex;align-items:center;gap:8px;min-width:0;flex:1 1 auto;overflow:hidden;font-size:calc(19px * var(--bsw-fs,1));color:var(--dsw-alias-label-secondary,#9AA3B6)}',
+      '.bsw-action-name{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:calc(16px * var(--bsw-fs,1));padding:0 8px;background:var(--dsw-alias-bg-layer-2,#191D26);border-radius:8px;color:var(--dsw-alias-label-primary,#E9ECF3);flex-shrink:0}',
       '.bsw-action-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-      '.bsw-row3{display:flex;align-items:center;gap:14px;margin-top:10px}',
+      '.bsw-row3{display:flex;align-items:center;gap:12px;margin-top:9px;padding-left:24px}',
       '.bsw-progress{position:relative;flex:1;height:10px;border-radius:999px;background:var(--dsw-alias-bg-layer-2,#191D26);overflow:visible}',
-      '.bsw-progress-fill{display:block;height:100%;width:100%;border-radius:999px;background:linear-gradient(90deg,var(--bsw-blue-2,#38BDF8),var(--bsw-blue,#4DA3FF));transform-origin:left;transition:transform .6s linear;position:relative;box-shadow:0 0 10px rgba(56,189,248,.55)}',
-      '.bsw-progress-fill::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 20%,rgba(255,255,255,.38) 48%,transparent 76%);animation:bsw-sheen 2.4s linear infinite}',
+      '.bsw-progress-fill{display:block;height:100%;width:100%;border-radius:999px;background:linear-gradient(90deg,var(--bsw-blue-2,#38BDF8),var(--bsw-blue,#4DA3FF));transform-origin:left;transition:transform .6s linear;position:relative;box-shadow:none}',
+      '.bsw-progress-fill::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 20%,rgba(255,255,255,.38) 48%,transparent 76%);opacity:.5;animation:bsw-sheen 2.4s linear infinite}',
       '@keyframes bsw-sheen{0%{transform:translateX(-120%)}100%{transform:translateX(220%)}}',
-      '.bsw-row3{display:flex;align-items:center;gap:14px;margin-top:12px}',
+      '.bsw-row3{display:flex;align-items:center;gap:12px;margin-top:10px;padding-left:24px}',
       '.bsw-tokens{min-width:110px;text-align:right}',
-      '.bsw-progress{position:relative;flex:1 1 auto;min-width:80px;height:14px;border-radius:999px;background:#1C2230;border:1px solid var(--dsw-alias-border-l1,#242833);box-sizing:border-box;overflow:visible}',
+      '.bsw-progress{position:relative;flex:1 1 auto;min-width:80px;height:16px;border-radius:999px;background:#2A3550;border:1px solid var(--dsw-alias-border-l2,#3B4560);box-sizing:border-box;overflow:visible;box-shadow:inset 0 1px 0 rgba(0,0,0,.45)}',
       '.bsw-tokens-line{display:flex;justify-content:flex-end}',
-      '.bsw-pet-runner{position:absolute;top:50%;width:38px;height:38px;transform:translate(-50%,-50%);pointer-events:none;transition:left .6s linear;z-index:2;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 1px 3px rgba(0,0,0,.55)) drop-shadow(0 0 8px rgba(56,189,248,.28));animation:bsw-swim 2.4s ease-in-out infinite}',
+      '.bsw-pet-runner{position:absolute;top:50%;width:30px;height:30px;transform:translate(-50%,-50%);pointer-events:none;transition:left .6s linear;z-index:2;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 2px 4px rgba(0,0,0,.55));animation:bsw-swim 2.4s ease-in-out infinite}',
       '@keyframes bsw-swim{0%,100%{transform:translate(-50%,-50%) rotate(-2deg) translateY(1px)}50%{transform:translate(-50%,-52%) rotate(3deg) translateY(-2px)}}',
       '.bsw-pet-tail{transform-box:fill-box;transform-origin:90% 50%;animation:bsw-pet-tail 1.3s ease-in-out infinite}',
       '@keyframes bsw-pet-tail{0%,100%{transform:rotate(0deg)}50%{transform:rotate(18deg)}}',
@@ -122,7 +170,7 @@ window.__ModuleLoader__.load({
       '.bsw-pet-img{width:100%;height:100%;object-fit:contain;display:block}',
       '.bsw-card-done .bsw-pet-runner{filter:grayscale(1) opacity(.45)}',
       '.bsw-progress-fill{border-radius:999px}',
-      '.bsw-tokens{font-size:calc(22px * var(--bsw-fs,1));font-variant-numeric:tabular-nums;color:var(--dsw-alias-label-secondary,#9AA3B6);white-space:nowrap}',
+      '.bsw-tokens{font-size:calc(21px * var(--bsw-fs,1));font-variant-numeric:tabular-nums;color:var(--dsw-alias-label-secondary,#9AA3B6);white-space:nowrap}',
       '.bsw-tokens-hot{color:var(--dsw-alias-state-warn-primary,#FFB020)}',
       '.bsw-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:26px 18px 30px;text-align:center}',
       '.bsw-radar{position:relative;width:150px;height:150px;border-radius:50%;border:1px solid var(--dsw-alias-border-l1,#242833);display:flex;align-items:center;justify-content:center;overflow:hidden}',
@@ -150,7 +198,7 @@ window.__ModuleLoader__.load({
       '.bsw-pill{background:linear-gradient(135deg,color-mix(in srgb,var(--bsw-blue-3,#2563EB) 22%,transparent),transparent),var(--dsw-alias-bg-overlay,rgba(24,28,38,.94))!important;border-color:var(--bsw-blue-2,#38BDF8)!important}',
       '.bsw-pill:hover{box-shadow:0 8px 26px color-mix(in srgb,var(--bsw-blue-2,#38BDF8) 22%,transparent)}',
       '.bsw-pop{border-color:rgba(77,163,255,.35)}',
-      '.bsw-dotwrap{width:28px;height:26px;display:flex;align-items:center;justify-content:center}',
+      '.bsw-dotwrap{width:18px;height:18px;display:flex;align-items:center;justify-content:center}',
       '.bsw-pill-text{display:inline-flex;align-items:baseline;gap:2px}',
       '@media (max-width:720px){.bsw-dock{bottom:116px;right:12px}}',
       '.bsw-settings{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;padding:12px 18px;border-bottom:1px solid var(--dsw-alias-border-l1,#242833);background:var(--dsw-alias-bg-layer-2,#191D26);font-size:calc(22px * var(--bsw-fs,1))}',
@@ -159,6 +207,11 @@ window.__ModuleLoader__.load({
       '.bsw-set-btn:hover{border-color:var(--bsw-blue-2,#38BDF8)}',
       '.bsw-set-btn-on{border-color:var(--bsw-blue-2,#38BDF8);background:rgba(56,189,248,.16);color:var(--bsw-blue-2,#38BDF8);font-weight:640}',
       '.bsw-sw-preview{width:22px;height:22px;border-radius:7px;display:inline-block;border:1px solid rgba(255,255,255,.25)}',
+      '.bsw-card[data-wait="1"]{border-left-color:var(--dsw-alias-state-warn-primary,#F59E0B)}',
+      '.bsw-action-name-wait{background:rgba(245,158,11,.16);color:var(--dsw-alias-state-warn-primary,#F59E0B)!important}',
+      '.bsw-pill[data-active="0"]{background:var(--dsw-alias-bg-overlay,rgba(24,28,38,.94))!important;border-color:var(--dsw-alias-border-l2,#2F3441)!important}',
+      '.bsw-top-tag{margin-left:6px;font-size:calc(15px * var(--bsw-fs,1));padding:1px 7px;border-radius:6px;background:rgba(245,158,11,.14);color:var(--dsw-alias-state-warn-primary,#F59E0B);line-height:1.4;white-space:nowrap;font-variant-numeric:tabular-nums}',
+      '.bsw-tokens{display:inline-flex;align-items:baseline;gap:2px}',
 
 
     ].join('\n')
@@ -211,11 +264,12 @@ window.__ModuleLoader__.load({
       const useSessionStatus = props.useSessionStatus
       const now = useNow(1000)
 
-      const sessions = useSessions(function (state) { return state })
+      const byIdSlice = useSessions(function (state) { return state && state.byId })
+      const projSlice = useSessions(function (state) { return state && state.projectionsBySession })
       const statuses = useSessionStatus(function (map) { return map })
 
-      const byId = (sessions && sessions.byId) || {}
-      const projections = (sessions && sessions.projectionsBySession) || {}
+      const byId = asRecord(byIdSlice)
+      const projections = asRecord(projSlice)
       const sessionId = React.useMemo(function () { return pickSession(byId) }, [byId])
 
       // 未 attach 的子会话投影需要主动刷新一次（官方同款做法：refreshProjections）
@@ -239,7 +293,7 @@ window.__ModuleLoader__.load({
           const childId = entry && entry.id
           if (!childId) return
           const summary = byId[childId] || {}
-          const status = statuses && typeof statuses.get === 'function' ? statuses.get(childId) : undefined
+          const status = statusOf(statuses, childId)
           const running = status ? status.running === true : summary.running === true
           const pv = summary.projectionValues || {}
           const timing = pv.subagentTiming
@@ -335,14 +389,31 @@ window.__ModuleLoader__.load({
       const now = props.now
       const done = !row.running
       // 进度条按「本屏消耗最多的那个」为满格，最长的就是用的最多的，一眼看出谁最费 token
-      const base = Number(props.maxTokens) > 0 ? Number(props.maxTokens) : (row.tokenCap || TOKEN_CAP)
-      const pct = Math.max(0.02, Math.min(1, row.tokens / base))
-      const hot = pct > 0.85
+      const comparable = Number(props.maxTokens) > 0
+      const base = comparable ? Number(props.maxTokens) : (row.tokenCap || TOKEN_CAP)
+      const pct = comparable ? Math.max(0.02, Math.min(1, row.tokens / base)) : (done ? 1 : 0.02)
+      const isTop = comparable && row.tokens >= Number(props.maxTokens) && row.tokens > 0
+      const hot = isTop && pct > 0.85
       const actionText = row.action && row.action.text ? row.action.text : ''
       const retiring = done && row.doneAt && now - row.doneAt > FADE_MS - 1500
+      const openable = typeof props.onOpen === 'function'
+      const activate = function () { if (openable) props.onOpen(row) }
       return h('div', {
-        className: 'bsw-card' + (done ? ' bsw-card-done' : '') + (retiring ? ' bsw-card-retire' : ''),
+        className: 'bsw-card' + (done ? ' bsw-card-done' : '') + (retiring ? ' bsw-card-retire' : '') + (openable ? ' bsw-card-open' : ''),
         'data-state': done ? 'done' : 'running',
+        'data-wait': !done && row.pendingInteraction ? '1' : undefined,
+        role: openable ? 'button' : undefined,
+        tabIndex: openable ? 0 : undefined,
+        title: openable ? '打开这个子代理的会话' : undefined,
+        onClick: openable ? activate : undefined,
+        onKeyDown: openable
+          ? function (event) {
+            if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
+              event.preventDefault()
+              activate()
+            }
+          }
+          : undefined,
       },
         h('div', { className: 'bsw-row1' },
           h('div', { className: 'bsw-name-wrap' },
@@ -357,9 +428,12 @@ window.__ModuleLoader__.load({
         h('div', { className: 'bsw-row2' },
           h('span', { className: 'bsw-id' }, row.agentId),
           h('span', { className: 'bsw-action' },
-            h('span', { className: 'bsw-action-name' }, done ? 'done' : (row.pendingInteraction ? 'wait' : 'live')),
+            h('span', {
+              className: 'bsw-action-name' + (!done && row.pendingInteraction ? ' bsw-action-name-wait' : ''),
+            }, done ? '完成' : (row.pendingInteraction ? '待处理' : '运行')),
             h('span', { className: 'bsw-action-text', title: actionText }, actionText)
-          )
+          ),
+          openable && h('span', { className: 'bsw-open-hint', 'aria-hidden': true }, '打开 ↗')
         ),
         h('div', { className: 'bsw-row3' },
           h('div', { className: 'bsw-progress' },
@@ -367,7 +441,8 @@ window.__ModuleLoader__.load({
             props.style !== 'minimal' && h(PetRunner, { done: done, pct: pct })
           ),
           h('span', { className: 'bsw-tokens' + (hot ? ' bsw-tokens-hot' : '') },
-            fmtTokens(row.tokens) + (row.tokens >= base ? ' 最高' : ''))
+            fmtTokens(row.tokens),
+            isTop && h('span', { className: 'bsw-top-tag' }, '最高'))
         )
       )
     }
@@ -514,6 +589,8 @@ window.__ModuleLoader__.load({
       const prefState = usePrefs()
       const prefs = prefState[0]
       const updatePrefs = prefState[1]
+      const popRef = React.useRef(null)
+      const pillRef = React.useRef(null)
       const settingsState = React.useState(false)
       const showSettings = settingsState[0]
       const setShowSettings = settingsState[1]
@@ -524,23 +601,50 @@ window.__ModuleLoader__.load({
       const rows = allRows.slice(0, MAX_ROWS)
       const degraded = rows.length > MAX_ANIMATED
       const light = !degraded && rows.length > LIGHT_ANIMATED
-      const maxTokens = rows.reduce(function (max, row) { return row.running ? Math.max(max, row.tokens) : max }, 0) || 1
+      const maxTokens = rows.reduce(function (max, row) { return Math.max(max, row.tokens) }, 0)
+      React.useEffect(function () {
+        if (!open || typeof document === 'undefined') return function () {}
+        function onKey(event) {
+          if (event.key === 'Escape') {
+            setOpen(false)
+            if (pillRef.current && typeof pillRef.current.focus === 'function') pillRef.current.focus()
+          }
+        }
+        function onPointer(event) {
+          const target = event.target
+          if (popRef.current && popRef.current.contains(target)) return
+          if (pillRef.current && pillRef.current.contains(target)) return
+          setOpen(false)
+        }
+        document.addEventListener('keydown', onKey, true)
+        document.addEventListener('pointerdown', onPointer, true)
+        return function () {
+          document.removeEventListener('keydown', onKey, true)
+          document.removeEventListener('pointerdown', onPointer, true)
+        }
+      }, [open])
+
       const palettes = Object.keys(PALETTES)
       const fonts = Object.keys(FONT_STEPS)
+      // 点卡片：跳到那个子代理的会话；跳成功就收起弹层，让位给对话
+      function openRow(row) {
+        if (!openAgentSession(row.id)) return
+        setOpen(false)
+      }
       return h('div', {
         className: 'bsw-dock' + (!prefs.animate || degraded ? ' bsw-static' : (light ? ' bsw-light' : '')),
         style: prefsStyle(prefs),
       },
-        open && h('div', { className: 'bsw-pop', role: 'dialog', 'aria-label': '鱼群雷达' },
+        open && h('div', { className: 'bsw-pop', id: 'bsw-pop', role: 'dialog', 'aria-modal': 'false', 'aria-label': '鱼群雷达', ref: popRef },
           h('div', { className: 'bsw-pop-head' },
             h('div', { className: 'bsw-pop-title' },
               prefs.style === 'cute'
-                ? h('span', { className: 'bsw-fish-row' }, fishList(active, hasActive, Math.round(24 * fontScale), 4))
+                ? h('span', { className: 'bsw-fish-row' }, fishList(active, hasActive, Math.round(20 * fontScale)))
                 : h('span', { className: 'bsw-pill-dot' + (hasActive ? ' bsw-pill-dot-live' : ' bsw-pill-dot-idle') }),
               h('span', null, '鱼群雷达')
             ),
             h('div', { className: 'bsw-pop-scan' }, h('i')),
-            h('div', { className: 'bsw-pop-stat' }, active + ' 活跃 · ' + fmtTokens(data.totalTokens) + ' tok'),
+            h('div', { className: 'bsw-pop-stat' }, active + ' 活跃'),
             h('button', {
               type: 'button', className: 'bsw-pop-close',
               title: '设置', 'aria-label': '设置',
@@ -608,12 +712,16 @@ window.__ModuleLoader__.load({
           h('div', { className: 'bsw-pop-body' },
             rows.length === 0
               ? h(EmptyState)
-              : rows.map(function (row) { return h(AgentCard, { key: row.id, row: row, now: data.now, maxTokens: maxTokens, style: prefs.style }) })
+              : rows.map(function (row) { return h(AgentCard, { key: row.id, row: row, now: data.now, maxTokens: maxTokens, style: prefs.style, onOpen: openRow }) })
           )
         ),
         h('button', {
           type: 'button', className: 'bsw-pill',
-          title: hasActive ? (active + ' 个子智能体正在工作，点击查看') : '暂无活跃子智能体，点击查看',
+          ref: pillRef,
+          'data-active': String(active),
+          'aria-haspopup': 'dialog',
+          'aria-controls': 'bsw-pop',
+          title: (hasActive ? active + ' 个子智能体正在工作' : '暂无活跃子智能体') + '，共消耗 ' + fmtTokens(data.totalTokens) + ' tok，点击查看',
           'aria-expanded': open ? 'true' : 'false',
           onClick: function () { setOpen(function (value) { return !value }) },
         },
@@ -621,8 +729,8 @@ window.__ModuleLoader__.load({
             ? h('span', { className: 'bsw-fish-row' }, fishList(active, hasActive, Math.round(20 * fontScale)))
             : h('span', { className: 'bsw-pill-dot' + (hasActive ? ' bsw-pill-dot-live' : ' bsw-pill-dot-idle') }),
           h('span', { className: 'bsw-pill-text' },
-            h('span', { className: 'bsw-pill-count' + (hasActive ? '' : ' bsw-pill-count-idle') }, String(active)),
-            h('span', null, ' 活跃')
+            hasActive && h('span', { className: 'bsw-pill-count' }, String(active)),
+            h('span', null, hasActive ? ' 活跃' : ' 空闲')
           ),
           h('span', { className: 'bsw-pill-caret' }, open ? '▾' : '▴')
         )
@@ -633,7 +741,17 @@ window.__ModuleLoader__.load({
       inject: ['slots'],
       apply(ctx) {
         serviceCtx = ctx
-        ensureCss()
+        if (typeof ctx.effect === 'function') {
+          ctx.effect(function () {
+            ensureCss()
+            return function () {
+              const tag = typeof document !== 'undefined' ? document.getElementById('bigfish-swarm-css') : null
+              if (tag && tag.parentNode) tag.parentNode.removeChild(tag)
+            }
+          })
+        } else {
+          ensureCss()
+        }
         try {
           ctx.slots.inject('shell.overlay', function () {
             return ctx.slots.register({
