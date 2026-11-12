@@ -1,6 +1,6 @@
 {
   "name": "@local/bigfish-swarm",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "private": true,
   "description": "鱼群雷达：在 DSH 右下角实时显示正在工作或刚完成的子智能体，带任务、耗时与 token 进度条，肥鱼/极简双主题。",
   "keywords": [

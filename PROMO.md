@@ -23,7 +23,7 @@ https://github.com/mingweima/dsh-swarm
 蓝毛小女仆大肥鱼拉着条往前游。
 
 只看活着的：正在跑的 + 刚完成 60 秒内的，干完自动淡出，眼睛不被死卡片占着。
-肥鱼 / 极简双主题，四档字号、五套色系，设置存本机，20 个 agent 一起跑也不炸。
+肥鱼 / 极简双主题，五档字号、五套色系，设置存本机，20 个 agent 一起跑也不炸。
 
 装法：Plugins → Add plugin → 填 github:mingweima/dsh-swarm
 命令行：dsh plugin --profile desktop add github:mingweima/dsh-swarm

@@ -556,19 +556,22 @@ window.__ModuleLoader__.load({
       green: { name: '绿', colors: ['#34D399', '#6EE7B7', '#059669'] },
       amber: { name: '橙', colors: ['#FBBF24', '#FCD34D', '#D97706'] },
     }
-    const FONT_STEPS = { xs: { name: '特小', scale: 0.72 }, s: { name: '小', scale: 0.84 }, m: { name: '中', scale: 1 }, l: { name: '大', scale: 1.16 } }
+    const FONT_STEPS = { xxs: { name: '极小', scale: 0.6 }, xs: { name: '特小', scale: 0.72 }, s: { name: '小', scale: 0.84 }, m: { name: '中', scale: 1 }, l: { name: '大', scale: 1.16 } }
     const STYLE_OPTIONS = { cute: '肥鱼', minimal: '极简' }
-    const DEFAULT_PREFS = { font: 'm', palette: 'blue', animate: true, showDone: true, style: 'cute' }
+    const PREFS_VERSION = 2
+    const DEFAULT_PREFS = { font: 'xxs', palette: 'blue', animate: false, showDone: true, style: 'cute' }
 
     function readPrefs() {
       try {
         const raw = window.localStorage.getItem(PREFS_KEY)
         if (!raw) return Object.assign({}, DEFAULT_PREFS)
         const parsed = JSON.parse(raw) || {}
+        // 旧版本（没有 v 字段）迁移一次：字号与动画改成新的默认，其余保留
+        const migrated = parsed.v !== PREFS_VERSION
         return {
-          font: FONT_STEPS[parsed.font] ? parsed.font : DEFAULT_PREFS.font,
+          font: !migrated && FONT_STEPS[parsed.font] ? parsed.font : DEFAULT_PREFS.font,
           palette: PALETTES[parsed.palette] ? parsed.palette : DEFAULT_PREFS.palette,
-          animate: parsed.animate !== false,
+          animate: migrated ? DEFAULT_PREFS.animate : parsed.animate === true,
           showDone: parsed.showDone !== false,
           style: STYLE_OPTIONS[parsed.style] ? parsed.style : DEFAULT_PREFS.style,
         }
@@ -583,7 +586,7 @@ window.__ModuleLoader__.load({
       const setPrefs = state[1]
       function update(patch) {
         setPrefs(function (prev) {
-          const next = Object.assign({}, prev, patch)
+          const next = Object.assign({}, prev, patch, { v: PREFS_VERSION })
           try { window.localStorage.setItem(PREFS_KEY, JSON.stringify(next)) } catch (error) { /* 忽略 */ }
           return next
         })
