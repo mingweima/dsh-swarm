@@ -27,7 +27,7 @@ https://github.com/mingweima/dsh-swarm
 
 装法：Plugins → Add plugin → 填 github:mingweima/dsh-swarm
 命令行：dsh plugin --profile desktop add github:mingweima/dsh-swarm
-要求 DSH >= 0.2.2-rc.2。
+要求 DSH `>=0.2.2-rc.2 <0.3.0`。
 ```
 
 ---
