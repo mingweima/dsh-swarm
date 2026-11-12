@@ -20,15 +20,35 @@ window.__ModuleLoader__.load({
     let serviceCtx = null
 
     // 点击卡片 → 打开对应子代理会话；用官方导航入口 uiWorkspace.openSession(SessionId)
+    function resolveWorkspace(ctx) {
+      if (!ctx) return null
+      const candidates = []
+      try { candidates.push(ctx.uiWorkspace) } catch (error) { /* 服务未注入 */ }
+      if (typeof ctx.get === 'function') {
+        try { candidates.push(ctx.get('uiWorkspace')) } catch (error) { /* 服务未注册 */ }
+      }
+      const root = ctx.root
+      if (root) {
+        try { candidates.push(root.uiWorkspace) } catch (error) { /* 同上 */ }
+        if (typeof root.get === 'function') {
+          try { candidates.push(root.get('uiWorkspace')) } catch (error) { /* 同上 */ }
+        }
+      }
+      for (let i = 0; i < candidates.length; i += 1) {
+        const face = candidates[i]
+        if (face && typeof face.openSession === 'function') return face
+      }
+      return null
+    }
+
+    // 返回 true 表示已发起跳转，'no-service' / 'failed' 表示具体失败原因
     function openAgentSession(sessionId) {
-      if (!sessionId) return false
-      const ctx = serviceCtx
-      if (!ctx) return false
-      let face = null
-      try {
-        face = (ctx.uiWorkspace) || (typeof ctx.get === 'function' ? ctx.get('uiWorkspace') : null)
-      } catch (error) { face = null }
-      if (!face || typeof face.openSession !== 'function') return false
+      if (!sessionId) return 'failed'
+      const face = resolveWorkspace(serviceCtx)
+      if (!face) {
+        if (typeof console !== 'undefined') console.warn('[bigfish-swarm] uiWorkspace 不可用', serviceCtx && Object.keys(serviceCtx).slice(0, 20))
+        return 'no-service'
+      }
       try {
         const pending = face.openSession(String(sessionId))
         if (pending && typeof pending.catch === 'function') {
@@ -39,7 +59,7 @@ window.__ModuleLoader__.load({
         return true
       } catch (error) {
         if (typeof console !== 'undefined') console.warn('[bigfish-swarm] openSession failed', error)
-        return false
+        return 'failed'
       }
     }
 
@@ -207,6 +227,7 @@ window.__ModuleLoader__.load({
       '.bsw-set-btn:hover{border-color:var(--bsw-blue-2,#38BDF8)}',
       '.bsw-set-btn-on{border-color:var(--bsw-blue-2,#38BDF8);background:rgba(56,189,248,.16);color:var(--bsw-blue-2,#38BDF8);font-weight:640}',
       '.bsw-sw-preview{width:22px;height:22px;border-radius:7px;display:inline-block;border:1px solid rgba(255,255,255,.25)}',
+      '.bsw-notice{padding:9px 16px;font-size:calc(16px * var(--bsw-fs,1));color:var(--dsw-alias-state-warn-primary,#F59E0B);background:rgba(245,158,11,.12);border-bottom:1px solid rgba(245,158,11,.3)}',
       '.bsw-card[data-wait="1"]{border-left-color:var(--dsw-alias-state-warn-primary,#F59E0B)}',
       '.bsw-action-name-wait{background:rgba(245,158,11,.16);color:var(--dsw-alias-state-warn-primary,#F59E0B)!important}',
       '.bsw-pill[data-active="0"]{background:var(--dsw-alias-bg-overlay,rgba(24,28,38,.94))!important;border-color:var(--dsw-alias-border-l2,#2F3441)!important}',
@@ -591,6 +612,9 @@ window.__ModuleLoader__.load({
       const updatePrefs = prefState[1]
       const popRef = React.useRef(null)
       const pillRef = React.useRef(null)
+      const noticeState = React.useState('')
+      const notice = noticeState[0]
+      const setNotice = noticeState[1]
       const settingsState = React.useState(false)
       const showSettings = settingsState[0]
       const setShowSettings = settingsState[1]
@@ -628,8 +652,10 @@ window.__ModuleLoader__.load({
       const fonts = Object.keys(FONT_STEPS)
       // 点卡片：跳到那个子代理的会话；跳成功就收起弹层，让位给对话
       function openRow(row) {
-        if (!openAgentSession(row.id)) return
-        setOpen(false)
+        const result = openAgentSession(row.id)
+        if (result === true) { setNotice(''); setOpen(false); return }
+        setNotice(result === 'no-service' ? '跳转失败：拿不到会话导航服务（uiWorkspace）' : '这个会话打不开，可能已结束')
+        if (typeof window !== 'undefined') window.setTimeout(function () { setNotice('') }, 4000)
       }
       return h('div', {
         className: 'bsw-dock' + (!prefs.animate || degraded ? ' bsw-static' : (light ? ' bsw-light' : '')),
@@ -709,6 +735,7 @@ window.__ModuleLoader__.load({
               }, '隐藏')
             )
           ),
+          notice && h('div', { className: 'bsw-notice', role: 'status' }, notice),
           h('div', { className: 'bsw-pop-body' },
             rows.length === 0
               ? h(EmptyState)
