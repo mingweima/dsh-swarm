@@ -1,0 +1,3 @@
+- insert:
+    - id: bigfish-swarm
+      name: '@local/bigfish-swarm'
